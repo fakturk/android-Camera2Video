@@ -26,6 +26,7 @@ public class SmallCircleView extends View {
     }
 
     boolean isVertical = true;
+    int offset = 400;
 
 
 
@@ -118,12 +119,12 @@ public class SmallCircleView extends View {
         if (isVertical)
         {
             //for vertical line
-            canvas.drawLine(x, 100,x,yCm*length+100,paintText);
+            canvas.drawLine(x, offset,x,yCm*length+offset,paintText);
 
             for (int i = 0; i <= length; i++)
             {
-                canvas.drawLine(x-10,100+yCm*i,x+10,100+yCm*i,paintText);
-                canvas.drawText(String.valueOf(i),x+20,100+yCm*i,paintText);
+                canvas.drawLine(x-10,offset+yCm*i,x+10,offset+yCm*i,paintText);
+                canvas.drawText(String.valueOf(i),x+20,offset+yCm*i,paintText);
             }
 
 
@@ -131,11 +132,11 @@ public class SmallCircleView extends View {
         else
         {
             //for horizaontal line
-            canvas.drawLine(100, y,xCm*length+100,y,paintText);
+            canvas.drawLine(offset, y,xCm*length+offset,y,paintText);
             for (int i = 0; i <= length; i++)
             {
-                canvas.drawLine(100+xCm*i,y-10,100+xCm*i,y+10,paintText);
-                canvas.drawText(String.valueOf(i),100+xCm*i-10,y-30,paintText);
+                canvas.drawLine(offset+xCm*i,y-10,offset+xCm*i,y+10,paintText);
+                canvas.drawText(String.valueOf(i),offset+xCm*i-10,y-30,paintText);
             }
 
         }

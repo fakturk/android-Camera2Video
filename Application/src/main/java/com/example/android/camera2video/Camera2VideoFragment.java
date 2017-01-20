@@ -368,11 +368,11 @@ public class Camera2VideoFragment extends Fragment
             public void run() {
                 // Update logic here
                 currentY=smallCircleView.getY();
-                if (currentY>yCm*5+100)
+                if (currentY>yCm*5+400)
                 {
                     updateY=-5;
                 }
-                if (currentY<100)
+                if (currentY<400)
                 {
                     updateY=5;
                 }
