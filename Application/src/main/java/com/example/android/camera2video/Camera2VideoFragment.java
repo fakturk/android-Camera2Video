@@ -22,8 +22,12 @@ import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
 import android.app.Fragment;
+import android.app.FragmentTransaction;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Matrix;
@@ -38,12 +42,14 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v13.app.FragmentCompat;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -61,11 +67,30 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import static android.hardware.SensorManager.GRAVITY_EARTH;
+
 public class Camera2VideoFragment extends Fragment
         implements View.OnClickListener, FragmentCompat.OnRequestPermissionsResultCallback {
+    float[] acc,gyr,mag, oldAcc, oldGyr, oldMag, gravity,startingEuler, initialMag, rotational_vel, rotatedGyr, rotMag, rotational_vel_earth,linear_acc;
+    float[][] rotation;
+    boolean start;
+    String accMesaage;
+    Gravity g;
+    Orientation orientation;
+    DynamicAcceleration dynamic;
+    float omega_x, omega_y, omega_z, angle;
+
+    SmallCircleView smallCircleView;
+    Fragment f;
+
+    float currentY=100, updateY=5;
+
+
 
     private static final int SENSOR_ORIENTATION_DEFAULT_DEGREES = 90;
     private static final int SENSOR_ORIENTATION_INVERSE_DEGREES = 270;
@@ -276,15 +301,204 @@ public class Camera2VideoFragment extends Fragment
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_camera2_video, container, false);
+        View view = inflater.inflate(R.layout.fragment_camera2_video, container, false);
+        smallCircleView = (SmallCircleView) view.findViewById(R.id.smallCircleView);
+        return view;
+    }
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState)
+    {
+
+        super.onActivityCreated(savedInstanceState);
+
+
+
+
     }
 
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
+        g = new Gravity();
+        orientation = new Orientation();
+        dynamic = new DynamicAcceleration();
+        acc = new float[3];
+        gyr = new float[3];
+        mag = new float[3];
+        gravity = new float[3];
+        oldAcc = null;
+        oldGyr = null;
+        oldMag =null;
+        start = false;
+        omega_x = 0;
+        omega_y = 0;
+        omega_z = 0;
+        rotational_vel = new float[]{0,0,0};
+        rotatedGyr = new float[3];
+        rotational_vel_earth = new float[]{0,0,0};
+        linear_acc = new float[]{0,0,0};
+        rotMag = new float[]{0, 0, 0};
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        {
+            LocalBroadcastManager.getInstance(getContext()).registerReceiver(new BroadcastReceiver()
+            {
+                @Override
+                public void onReceive(Context context, Intent intent)
+                {
+                    calculateGravity(intent);
+
+
+
+                }
+            }, new IntentFilter(SensorService.ACTION_SENSOR_BROADCAST));
+        }
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
         mButtonVideo = (Button) view.findViewById(R.id.video);
         mButtonVideo.setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
+
+        //        smallCircleView = (SmallCircleView) Camera2VideoFragment.newInstance().getView().findViewById(R.id.smallCircleView);
+        float ydpi = getResources().getDisplayMetrics().ydpi; //1 inch
+        final float yCm = ydpi/2.54f;
+
+
+        TimerTask myTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                // Update logic here
+                currentY=smallCircleView.getY();
+                if (currentY>yCm*5+100)
+                {
+                    updateY=-5;
+                }
+                if (currentY<100)
+                {
+                    updateY=5;
+                }
+
+
+
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Drawing logic here
+                        smallCircleView.setYMove(updateY);
+
+                    }
+                });
+            }
+        };
+        Timer timer = new Timer();
+        timer.schedule(myTimerTask, 10, 10);
+
+
+    }
+
+    private void calculateGravity(Intent intent)
+    {
+        acc= intent.getFloatArrayExtra("ACC_DATA");
+        gyr = intent.getFloatArrayExtra("GYR_DATA");
+        mag = intent.getFloatArrayExtra("MAG_DATA");
+        if (acc != null && oldAcc == null)
+        {
+            oldAcc = new float[3];
+            System.arraycopy(acc, 0, oldAcc, 0, acc.length);
+
+        }
+        if (gyr != null && oldGyr == null)
+        {
+            oldGyr = new float[3];
+            System.arraycopy(gyr, 0, oldGyr, 0, gyr.length);
+
+        }
+        if (mag != null && oldMag == null)
+        {
+            oldMag = new float[3];
+            System.arraycopy(mag, 0, oldMag, 0, mag.length);
+
+        }
+        if (acc == null && oldAcc != null)
+        {
+            acc = new float[3];
+            System.arraycopy(oldAcc, 0, acc, 0, oldAcc.length);
+
+        }
+        if (gyr == null && oldGyr != null)
+        {
+            gyr = new float[]{0, 0, 0};
+
+        }
+        if (mag == null && oldMag != null)
+        {
+            mag = new float[3];
+            System.arraycopy(oldMag, 0, mag, 0, oldMag.length);
+
+        }
+
+
+        if (acc != null && gyr != null && mag!=null &&start != true )
+        {
+            start = true;
+            Log.d("start","");
+            float accNorm = (float) Math.sqrt(Math.pow(acc[0], 2) + Math.pow(acc[1], 2) + Math.pow(acc[2], 2));
+            for (int j = 0; j < 3; j++)
+            {
+                gravity[j] = acc[j] * (GRAVITY_EARTH / accNorm);
+            }
+            rotation = orientation.rotationFromGravity(gravity);
+            startingEuler = orientation.eulerFromRotation(rotation);
+//                    Log.d("initial mag  : ",initialMag[0]+" "+initialMag[1]+" "+initialMag[2]);
+
+            initialMag = orientation.rotationVectorMultiplication(orientation.rotationTranspose(rotation),mag);
+
+
+//                    System.arraycopy(mag, 0, initialMag, 0, mag.length);
+//                    Log.d("initial mag  : ",initialMag[0]+" "+initialMag[1]+" "+initialMag[2]);
+
+
+
+
+        }
+        if (start)
+        {
+
+            rotation = orientation.rotationFromGravity(gravity);
+            rotational_vel[0] += gyr[0] * dynamic.getDeltaT();
+            rotational_vel[1] -= gyr[1] * dynamic.getDeltaT();
+            rotational_vel[2] += gyr[2] * dynamic.getDeltaT();
+
+            rotatedGyr = orientation.rotatedGyr(gyr, rotation);
+
+            omega_x += rotatedGyr[0] * dynamic.getDeltaT();
+            omega_y += rotatedGyr[1] * dynamic.getDeltaT();
+            omega_z += rotatedGyr[2] * dynamic.getDeltaT();
+            rotation = orientation.updateRotationMatrix(rotation, rotatedGyr, dynamic.getDeltaT());
+
+            gravity = g.gravityAfterRotation(rotation);
+            rotMag = orientation.rotationVectorMultiplication(orientation.rotationTranspose(rotation),mag);
+            angle =  (orientation.angleBetweenMag(initialMag,orientation.rotationVectorMultiplication(orientation.rotationTranspose(rotation),mag)));
+            rotation = orientation.updateRotationAfterOmegaZ(rotation, angle);
+            rotational_vel_earth = orientation.eulerFromRotation(rotation);
+            rotational_vel_earth = orientation.reRotatedGyr(rotational_vel_earth,rotation);
+
+            System.arraycopy(acc, 0, oldAcc, 0, acc.length);
+            System.arraycopy(mag, 0, oldMag, 0, acc.length);
+
+            for (int i = 0; i <3 ; i++)
+            {
+                linear_acc[i]=acc[i]-gravity[i];
+
+
+            }
+
+        }
+        if (acc!=null && mIsRecordingVideo)
+        {
+            accMesaage = intent.getLongExtra("TIME",0)+" "+acc[0]+" "+acc[1]+" "+acc[2]+" "+gravity[0]+" "+gravity[1]+" "+gravity[2]+" "+linear_acc[0]+" "+linear_acc[1]+" "+linear_acc[2];
+            Log.d("acc ", accMesaage);
+
+        }
     }
 
     @Override
@@ -675,6 +889,13 @@ public class Camera2VideoFragment extends Fragment
         // UI
         mIsRecordingVideo = false;
         mButtonVideo.setText(R.string.record);
+        // Added by Ben Ning, to resolve exception issue when stop recording.
+        try {
+            mPreviewSession.stopRepeating();
+            mPreviewSession.abortCaptures();
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
         // Stop recording
         mMediaRecorder.stop();
         mMediaRecorder.reset();

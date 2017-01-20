@@ -14,8 +14,9 @@
  limitations under the License.
 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:id="@+id/butun">
 
     <com.example.android.camera2video.AutoFitTextureView
         android:id="@+id/texture"
@@ -23,14 +24,21 @@
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true" />
+    <view
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        class="com.example.android.camera2video.SmallCircleView"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:id="@+id/smallCircleView" />
 
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_alignParentStart="true"
-        android:layout_below="@id/texture"
-        android:background="#4285f4">
+        android:background="#4285f4"
+        >
 
         <Button
             android:id="@+id/video"
